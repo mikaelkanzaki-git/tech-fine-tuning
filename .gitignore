@@ -1,0 +1,25 @@
+.venv/
+.uv-cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-tmp/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.env
+.env.*
+!.env.example
+
+# Derivações reproduzíveis do dataset canônico.
+artifacts/sft/
+
+# Checkpoints e saídas de treinamento não devem entrar no Git.
+artifacts/training/
+artifacts/model/
+/models/
+/checkpoints/

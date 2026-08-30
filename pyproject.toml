@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tech-fine-tuning"
+version = "0.1.0"
+description = "Preparação, fine-tuning e avaliação do modelo médico do Tech Challenge."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+  { name = "FIAP Tech Challenge - Grupo" },
+]
+dependencies = []
+
+[project.scripts]
+tech-fine-tuning = "tech_fine_tuning.runner:main"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.17,<2",
+  "pytest>=8.4,<10",
+  "pytest-cov>=6.2,<8",
+  "ruff>=0.12,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tech_fine_tuning"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers -p no:cacheprovider --cov=src/tech_fine_tuning --cov-report=term-missing"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/tech_fine_tuning/runner.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[tool.coverage.run]
+branch = true
+omit = ["src/tech_fine_tuning/runner.py"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
