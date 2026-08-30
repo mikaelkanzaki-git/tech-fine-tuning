@@ -6,6 +6,7 @@
 .pytest_cache
 artifacts
 cache
+unsloth_compiled_cache
 tests
 __pycache__
 *.pyc

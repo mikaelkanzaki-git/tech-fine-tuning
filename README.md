@@ -73,7 +73,16 @@ uv run tech-fine-tuning train
 ```
 
 O extra fixa `unsloth==2026.8.22` no `uv.lock`. O diagnóstico mostra GPU, memória, driver, CUDA,
-BF16 e versões efetivas dos pacotes antes de permitir o treinamento.
+BF16 e versões efetivas dos pacotes antes de permitir o treinamento. Em Windows e Linux, `torch`
+e `torchvision` são obtidos do índice oficial `pytorch-cu130`; isso evita a instalação silenciosa
+do wheel `+cpu` disponível no PyPI comum.
+
+Depois de atualizar um checkout que já possuía a variante CPU, force a sincronização uma vez:
+
+```powershell
+uv sync --dev --extra training --locked --reinstall-package torch --reinstall-package torchvision
+uv run tech-fine-tuning diagnose --require-training
+```
 
 Para retomar uma interrupção:
 

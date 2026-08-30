@@ -15,6 +15,8 @@ dependencies = []
 
 [project.optional-dependencies]
 training = [
+  "torch==2.11.0",
+  "torchvision==0.26.0",
   "unsloth==2026.8.22",
 ]
 
@@ -28,6 +30,19 @@ dev = [
   "pytest-cov>=6.2,<8",
   "ruff>=0.12,<1",
 ]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tech_fine_tuning"]
