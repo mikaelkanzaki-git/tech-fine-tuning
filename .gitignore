@@ -23,3 +23,4 @@ artifacts/training/
 artifacts/model/
 /models/
 /checkpoints/
+/cache/

@@ -1,4 +1,4 @@
-"""Configuração explícita da preparação do dataset SFT."""
+"""Configuração explícita dos comandos do serviço."""
 
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ class Settings:
 
     canonical_dataset_path: Path = Path("../tech-ingestao/artifacts/dataset")
     sft_output_path: Path = Path("artifacts/sft")
+    training_config_path: Path = Path("configs/qwen3-4b/smoke.toml")
+    training_output_path: Path = Path("artifacts/training/qwen3-4b-smoke")
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
     def __post_init__(self) -> None:
@@ -39,5 +41,17 @@ class Settings:
                 )
             ),
             sft_output_path=Path(values.get("TECH_FINE_TUNING_SFT_OUTPUT_PATH", "artifacts/sft")),
+            training_config_path=Path(
+                values.get(
+                    "TECH_FINE_TUNING_TRAINING_CONFIG_PATH",
+                    "configs/qwen3-4b/smoke.toml",
+                )
+            ),
+            training_output_path=Path(
+                values.get(
+                    "TECH_FINE_TUNING_TRAINING_OUTPUT_PATH",
+                    "artifacts/training/qwen3-4b-smoke",
+                )
+            ),
             system_prompt=values.get("TECH_FINE_TUNING_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),
         )

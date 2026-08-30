@@ -13,6 +13,11 @@ authors = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+training = [
+  "unsloth==2026.8.22",
+]
+
 [project.scripts]
 tech-fine-tuning = "tech_fine_tuning.runner:main"
 
@@ -49,7 +54,10 @@ files = ["src", "tests"]
 
 [tool.coverage.run]
 branch = true
-omit = ["src/tech_fine_tuning/runner.py"]
+omit = [
+  "src/tech_fine_tuning/runner.py",
+  "src/tech_fine_tuning/integrations/training/unsloth.py",
+]
 
 [tool.coverage.report]
 fail_under = 90

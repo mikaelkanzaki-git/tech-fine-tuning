@@ -1,0 +1,41 @@
+schema_version = "1.0"
+run_name = "qwen3-4b-medquad-full"
+
+[model]
+id = "unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit"
+revision = "7744afa8566e264af1a92a806d8d9aae00cc7c78"
+base_id = "Qwen/Qwen3-4B-Instruct-2507"
+base_revision = "f5d253c7173262c9fbfd68aee1eda21bdc375fb5"
+tokenizer_id = "Qwen/Qwen3-4B-Instruct-2507"
+tokenizer_revision = "f5d253c7173262c9fbfd68aee1eda21bdc375fb5"
+chat_template = "qwen3-instruct"
+max_sequence_length = 2048
+load_in_4bit = true
+
+[lora]
+rank = 16
+alpha = 16
+dropout = 0.0
+target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+use_gradient_checkpointing = "unsloth"
+use_rslora = false
+
+[dataset]
+num_proc = 2
+train_on_responses_only = true
+
+[trainer]
+per_device_train_batch_size = 1
+gradient_accumulation_steps = 8
+num_train_epochs = 1.0
+learning_rate = 0.00002
+warmup_steps = 50
+logging_steps = 10
+save_steps = 100
+eval_steps = 100
+save_total_limit = 3
+optimizer = "adamw_8bit"
+weight_decay = 0.001
+lr_scheduler_type = "linear"
+seed = 3407
+report_to = "none"

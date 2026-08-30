@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tech-challenge.local/schemas/training-run-manifest-1.0.json",
+  "title": "TrainingRunManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "started_at",
+    "completed_at",
+    "plan",
+    "environment",
+    "metrics",
+    "peak_reserved_memory_gib",
+    "failure_type"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "status": {"enum": ["running", "completed", "failed"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": ["string", "null"], "format": "date-time"},
+    "plan": {"type": "object"},
+    "environment": {"type": "object"},
+    "metrics": {"type": ["object", "null"]},
+    "peak_reserved_memory_gib": {"type": ["number", "null"], "minimum": 0},
+    "failure_type": {"type": ["string", "null"]}
+  }
+}

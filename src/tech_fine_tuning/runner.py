@@ -9,8 +9,18 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from tech_fine_tuning.config.settings import Settings
-from tech_fine_tuning.errors import ConfigurationError, DatasetReadError, SftPreparationError
+from tech_fine_tuning.errors import (
+    ConfigurationError,
+    DatasetReadError,
+    SftPreparationError,
+    TrainingConfigurationError,
+    TrainingDependencyError,
+    TrainingExecutionError,
+    TrainingPreflightError,
+)
+from tech_fine_tuning.integrations.system.diagnostics import collect_environment_diagnostic
 from tech_fine_tuning.services.sft_dataset_service import prepare_sft_dataset
+from tech_fine_tuning.services.training_service import execute_training
 
 
 def _build_parser(settings: Settings) -> argparse.ArgumentParser:
@@ -40,6 +50,26 @@ def _build_parser(settings: Settings) -> argparse.ArgumentParser:
         default=settings.system_prompt,
         help="Instrução de sistema repetida em cada exemplo.",
     )
+    diagnose_parser = subcommands.add_parser(
+        "diagnose",
+        help="Inspeciona GPU, CUDA e dependências opcionais de treinamento.",
+    )
+    diagnose_parser.add_argument(
+        "--require-training",
+        action="store_true",
+        help="Retorna erro quando o ambiente ainda não pode treinar.",
+    )
+    train_parser = subcommands.add_parser(
+        "train",
+        help="Executa ou valida uma run de fine-tuning reproduzível.",
+    )
+    train_parser.add_argument("--config", type=Path, default=settings.training_config_path)
+    train_parser.add_argument("--source", type=Path, default=settings.sft_output_path)
+    train_parser.add_argument("--output", type=Path, default=settings.training_output_path)
+    train_parser.add_argument("--resume-from-checkpoint", type=Path)
+    train_parser.add_argument("--producer-commit")
+    train_parser.add_argument("--allow-dirty", action="store_true")
+    train_parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -64,7 +94,35 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             print(f"Dataset SFT: {arguments.output.resolve()}")
             return 0
-    except (ConfigurationError, DatasetReadError, SftPreparationError) as error:
+        if arguments.command == "diagnose":
+            diagnostic = collect_environment_diagnostic()
+            print(json.dumps(diagnostic.as_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+            if arguments.require_training and not diagnostic.ready_for_training:
+                return 2
+            return 0
+        if arguments.command == "train":
+            project_root = Path(__file__).resolve().parents[2]
+            outcome = execute_training(
+                config_path=arguments.config,
+                source_path=arguments.source,
+                output_path=arguments.output,
+                project_root=project_root,
+                resume_from_checkpoint=arguments.resume_from_checkpoint,
+                producer_commit=arguments.producer_commit,
+                allow_dirty=arguments.allow_dirty,
+                dry_run=arguments.dry_run,
+            )
+            print(json.dumps(outcome.as_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+            return 0
+    except (
+        ConfigurationError,
+        DatasetReadError,
+        SftPreparationError,
+        TrainingConfigurationError,
+        TrainingDependencyError,
+        TrainingExecutionError,
+        TrainingPreflightError,
+    ) as error:
         print(f"Erro: {error}", file=sys.stderr)
         return 2
 

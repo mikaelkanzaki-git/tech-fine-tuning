@@ -1,0 +1,27 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+type: command
+display_name: qwen3-4b-medquad-smoke
+experiment_name: tech-fine-tuning
+code: ../..
+command: >-
+  python -m tech_fine_tuning diagnose --require-training &&
+  python -m tech_fine_tuning train
+  --config configs/qwen3-4b/smoke.toml
+  --source ${{inputs.sft_dataset}}
+  --output ${{outputs.training_output}}
+  --producer-commit ${{inputs.producer_commit}}
+inputs:
+  sft_dataset:
+    type: uri_folder
+    path: azureml:medquad-sft:1
+  producer_commit:
+    type: string
+    default: REPLACE_WITH_THE_40_CHARACTER_GIT_COMMIT
+outputs:
+  training_output:
+    type: uri_folder
+    mode: rw_mount
+environment: azureml:tech-fine-tuning-unsloth:1
+compute: azureml:gpu-cluster
+resources:
+  instance_count: 1

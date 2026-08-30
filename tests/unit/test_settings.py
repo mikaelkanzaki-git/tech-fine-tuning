@@ -13,6 +13,8 @@ def test_settings_use_documented_defaults() -> None:
 
     assert settings.canonical_dataset_path == Path("../tech-ingestao/artifacts/dataset")
     assert settings.sft_output_path == Path("artifacts/sft")
+    assert settings.training_config_path == Path("configs/qwen3-4b/smoke.toml")
+    assert settings.training_output_path == Path("artifacts/training/qwen3-4b-smoke")
     assert settings.system_prompt == DEFAULT_SYSTEM_PROMPT
 
 
@@ -21,12 +23,16 @@ def test_settings_read_environment_overrides() -> None:
         {
             "TECH_FINE_TUNING_CANONICAL_DATASET_PATH": "input",
             "TECH_FINE_TUNING_SFT_OUTPUT_PATH": "output",
+            "TECH_FINE_TUNING_TRAINING_CONFIG_PATH": "config.toml",
+            "TECH_FINE_TUNING_TRAINING_OUTPUT_PATH": "training-output",
             "TECH_FINE_TUNING_SYSTEM_PROMPT": "Custom system prompt",
         }
     )
 
     assert settings.canonical_dataset_path == Path("input")
     assert settings.sft_output_path == Path("output")
+    assert settings.training_config_path == Path("config.toml")
+    assert settings.training_output_path == Path("training-output")
     assert settings.system_prompt == "Custom system prompt"
 
 
