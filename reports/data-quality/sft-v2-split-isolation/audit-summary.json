@@ -1,0 +1,80 @@
+{
+  "cross_split_normalized_question_overlap": {
+    "train_test": 0,
+    "train_validation": 0,
+    "validation_test": 0
+  },
+  "examples": 16375,
+  "issue_counts": {
+    "answer_repeats_question": 494,
+    "duplicate_answer_within_split": 576,
+    "duplicate_question_within_split": 3410,
+    "estimated_context_overflow": 152,
+    "hpo_boilerplate": 2243,
+    "repeated_sentence": 90,
+    "resource_navigation_answer": 1085
+  },
+  "max_sequence_length": 2048,
+  "records_with_issues": 7596,
+  "schema_version": "1.0",
+  "splits": {
+    "test": {
+      "answer_chars": {
+        "maximum": 26980,
+        "p50": 903,
+        "p95": 3382,
+        "p99": 9069
+      },
+      "examples": 1483,
+      "issue_counts": {
+        "answer_repeats_question": 47,
+        "duplicate_answer_within_split": 44,
+        "duplicate_question_within_split": 321,
+        "estimated_context_overflow": 21,
+        "hpo_boilerplate": 214,
+        "repeated_sentence": 9,
+        "resource_navigation_answer": 94
+      },
+      "records_with_issues": 706
+    },
+    "train": {
+      "answer_chars": {
+        "maximum": 24668,
+        "p50": 872,
+        "p95": 3208,
+        "p99": 7501
+      },
+      "examples": 13332,
+      "issue_counts": {
+        "answer_repeats_question": 398,
+        "duplicate_answer_within_split": 478,
+        "duplicate_question_within_split": 2788,
+        "estimated_context_overflow": 118,
+        "hpo_boilerplate": 1814,
+        "repeated_sentence": 75,
+        "resource_navigation_answer": 888
+      },
+      "records_with_issues": 6188
+    },
+    "validation": {
+      "answer_chars": {
+        "maximum": 21381,
+        "p50": 880,
+        "p95": 3258,
+        "p99": 6436
+      },
+      "examples": 1560,
+      "issue_counts": {
+        "answer_repeats_question": 49,
+        "duplicate_answer_within_split": 54,
+        "duplicate_question_within_split": 301,
+        "estimated_context_overflow": 13,
+        "hpo_boilerplate": 215,
+        "repeated_sentence": 6,
+        "resource_navigation_answer": 103
+      },
+      "records_with_issues": 702
+    }
+  },
+  "token_estimate": "ceil(total_message_characters / 4)"
+}

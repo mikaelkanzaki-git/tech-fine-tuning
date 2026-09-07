@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 import importlib
+import time
 from collections.abc import Mapping
 from typing import Any
 
-from tech_fine_tuning.errors import TrainingDependencyError, TrainingExecutionError
+from tech_fine_tuning.errors import (
+    EvaluationExecutionError,
+    TrainingDependencyError,
+    TrainingExecutionError,
+)
+from tech_fine_tuning.models.evaluation import (
+    EvaluationExample,
+    EvaluationPlan,
+    GeneratedComparison,
+)
 from tech_fine_tuning.models.training import BackendTrainingResult, TrainingPlan
 
 
@@ -181,3 +191,118 @@ def run_unsloth_training(plan: TrainingPlan) -> BackendTrainingResult:
         adapter_path=adapter_path,
         peak_reserved_memory_gib=round(peak_memory, 3),
     )
+
+
+def _generate_answer(
+    *,
+    model: Any,
+    tokenizer: Any,
+    example: EvaluationExample,
+    max_new_tokens: int,
+    torch: Any,
+) -> tuple[str, float]:
+    inputs = tokenizer.apply_chat_template(
+        list(example.prompt_messages),
+        tokenize=True,
+        add_generation_prompt=True,
+        return_tensors="pt",
+        return_dict=True,
+    ).to("cuda")
+    input_length = int(inputs["input_ids"].shape[-1])
+    torch.cuda.synchronize()
+    started_at = time.perf_counter()
+    generation_config = model.generation_config
+    original_max_length = generation_config.max_length
+    generation_config.max_length = None
+    try:
+        with torch.inference_mode():
+            generated = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                use_cache=True,
+            )
+    finally:
+        generation_config.max_length = original_max_length
+    torch.cuda.synchronize()
+    latency = time.perf_counter() - started_at
+    answer = tokenizer.batch_decode(
+        generated[:, input_length:],
+        skip_special_tokens=True,
+    )[0].strip()
+    return answer, round(latency, 4)
+
+
+def run_unsloth_evaluation(plan: EvaluationPlan) -> tuple[GeneratedComparison, ...]:
+    """Gera respostas determinísticas do base e do mesmo modelo com o adaptador."""
+
+    torch = _module("torch")
+    unsloth = _module("unsloth")
+    chat_templates = _module("unsloth.chat_templates")
+    peft = _module("peft")
+    if not bool(torch.cuda.is_available()):
+        raise TrainingDependencyError("A avaliação Unsloth requer uma GPU CUDA visível.")
+
+    try:
+        model, tokenizer = unsloth.FastLanguageModel.from_pretrained(
+            model_name=plan.model_id,
+            revision=plan.model_revision,
+            max_seq_length=plan.max_sequence_length,
+            load_in_4bit=plan.load_in_4bit,
+            load_in_8bit=False,
+            full_finetuning=False,
+        )
+        tokenizer = chat_templates.get_chat_template(
+            tokenizer,
+            chat_template=plan.chat_template,
+        )
+        unsloth.FastLanguageModel.for_inference(model)
+
+        base_results: dict[str, tuple[str, float]] = {}
+        if plan.compare_base:
+            for example in plan.examples:
+                base_results[example.record_id] = _generate_answer(
+                    model=model,
+                    tokenizer=tokenizer,
+                    example=example,
+                    max_new_tokens=plan.max_new_tokens,
+                    torch=torch,
+                )
+
+        model = peft.PeftModel.from_pretrained(
+            model,
+            str(plan.adapter_path),
+            is_trainable=False,
+        )
+        unsloth.FastLanguageModel.for_inference(model)
+        comparisons: list[GeneratedComparison] = []
+        for example in plan.examples:
+            fine_tuned_answer, fine_tuned_latency = _generate_answer(
+                model=model,
+                tokenizer=tokenizer,
+                example=example,
+                max_new_tokens=plan.max_new_tokens,
+                torch=torch,
+            )
+            base_result = base_results.get(example.record_id)
+            if base_result is None:
+                base_answer = None
+                base_latency = None
+            else:
+                base_answer, base_latency = base_result
+            comparisons.append(
+                GeneratedComparison(
+                    record_id=example.record_id,
+                    fine_tuned_answer=fine_tuned_answer,
+                    fine_tuned_latency_seconds=fine_tuned_latency,
+                    base_answer=base_answer,
+                    base_latency_seconds=base_latency,
+                )
+            )
+    except (TrainingDependencyError, EvaluationExecutionError):
+        raise
+    except Exception as error:
+        raise EvaluationExecutionError(
+            f"O backend Unsloth interrompeu a avaliação: {type(error).__name__}."
+        ) from error
+    return tuple(comparisons)
