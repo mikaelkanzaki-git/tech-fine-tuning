@@ -95,7 +95,12 @@ def collect_environment_diagnostic() -> EnvironmentDiagnostic:
     for package in _TRAINING_PACKAGES:
         if packages[package] is None:
             issues.append(f"Dependência de treinamento ausente: {package}.")
-    if packages["torch"] is not None and not cuda_available:
+    if packages["torch"] is not None and cuda_runtime is None:
+        issues.append(
+            "O PyTorch instalado não inclui CUDA; sincronize o extra training "
+            "a partir do índice pytorch-cu130."
+        )
+    elif packages["torch"] is not None and not cuda_available:
         issues.append("PyTorch não encontrou um runtime CUDA utilizável.")
 
     return EnvironmentDiagnostic(

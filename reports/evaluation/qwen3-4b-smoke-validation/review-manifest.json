@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-09-07T20:02:58.411441+00:00",
+  "inputs_sha256": {
+    "completed_review": "77b4e52c79b2215c2af6b70af71cbf6632fd6425e0d5d3be1dca13e857cd9f61",
+    "evaluation_manifest": "432b05b68522a2843c61b77ad0feb0cf9f6b4798a2a485fdcbfd482997207074"
+  },
+  "outputs_sha256": {
+    "decision": "dc75ef8a41d863f58c09da38af11f10ba44fb58ffd35bedbc8af50754e4448fc",
+    "human_review_completed": "77b4e52c79b2215c2af6b70af71cbf6632fd6425e0d5d3be1dca13e857cd9f61",
+    "human_review_summary": "4f8115edf7517c6f1b9fd8649cd943acef167ebef6b4b29e5be6f6c575a1b8e3"
+  },
+  "schema_version": "1.0",
+  "status": "rejected"
+}

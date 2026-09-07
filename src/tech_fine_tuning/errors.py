@@ -27,3 +27,35 @@ class TrainingDependencyError(RuntimeError):
 
 class TrainingExecutionError(RuntimeError):
     """Indica falha do backend durante uma execução de treinamento."""
+
+
+class EvaluationPreflightError(ValueError):
+    """Indica que modelo, dataset ou destino não permitem uma avaliação válida."""
+
+
+class EvaluationExecutionError(RuntimeError):
+    """Indica uma falha ao gerar ou persistir resultados de avaliação."""
+
+
+class ReviewValidationError(ValueError):
+    """Indica que uma revisão humana está incompleta ou inconsistente."""
+
+
+class ReviewExecutionError(RuntimeError):
+    """Indica uma falha ao persistir o resultado consolidado da revisão."""
+
+
+class SftAuditValidationError(ValueError):
+    """Indica que um dataset SFT não pode ser auditado com segurança."""
+
+
+class SftAuditExecutionError(RuntimeError):
+    """Indica uma falha ao persistir o relatório da auditoria SFT."""
+
+
+class SftCurationValidationError(ValueError):
+    """Indica que o dataset SFT não pode ser curado com segurança."""
+
+
+class SftCurationExecutionError(RuntimeError):
+    """Indica uma falha ao persistir o dataset SFT curado."""

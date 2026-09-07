@@ -24,6 +24,7 @@ class Settings:
     sft_output_path: Path = Path("artifacts/sft")
     training_config_path: Path = Path("configs/qwen3-4b/smoke.toml")
     training_output_path: Path = Path("artifacts/training/qwen3-4b-smoke")
+    evaluation_output_path: Path = Path("artifacts/evaluation/qwen3-4b-smoke")
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
     def __post_init__(self) -> None:
@@ -51,6 +52,12 @@ class Settings:
                 values.get(
                     "TECH_FINE_TUNING_TRAINING_OUTPUT_PATH",
                     "artifacts/training/qwen3-4b-smoke",
+                )
+            ),
+            evaluation_output_path=Path(
+                values.get(
+                    "TECH_FINE_TUNING_EVALUATION_OUTPUT_PATH",
+                    "artifacts/evaluation/qwen3-4b-smoke",
                 )
             ),
             system_prompt=values.get("TECH_FINE_TUNING_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),

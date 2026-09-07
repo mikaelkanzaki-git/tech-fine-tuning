@@ -16,11 +16,13 @@ build/
 !.env.example
 
 # Derivações reproduzíveis do dataset canônico.
-artifacts/sft/
+artifacts/sft*/
 
 # Checkpoints e saídas de treinamento não devem entrar no Git.
 artifacts/training/
+artifacts/evaluation/
 artifacts/model/
 /models/
 /checkpoints/
 /cache/
+/unsloth_compiled_cache/

@@ -14,10 +14,18 @@ tech-ingestao/artifacts/dataset
         │ prepare-sft
         ▼
 artifacts/sft/{train,validation,test}.jsonl
-        │ train + perfil TOML
+        │ audit-sft
+        ├──────────────► reports/data-quality/<auditoria>
+        │ curate-sft
+        ▼
+artifacts/sft-candidate-v2/{train,validation,test}.jsonl
+        │ audit-sft + train + perfil TOML
         ▼
 artifacts/training/<run>/{adapter,checkpoints,manifestos}
-        │
+        │ evaluate
+        ▼
+artifacts/evaluation/<run>/<split>/{respostas,métricas,revisão}
+        │ modelo aprovado
         ▼
 tech-ai
 ```
@@ -49,6 +57,34 @@ O comando cria `train.jsonl`, `validation.jsonl`, `test.jsonl` e `manifest.json`
 vazamento entre documentos. O contrato está em
 [`docs/data/sft-dataset.md`](docs/data/sft-dataset.md).
 
+Antes de treinar, audite o material conversacional sem modificá-lo:
+
+```powershell
+uv run tech-fine-tuning audit-sft `
+  --source "artifacts/sft" `
+  --output "reports/data-quality/sft-baseline" `
+  --max-sequence-length 2048
+```
+
+O comando verifica os hashes do SFT e registra boilerplate recorrente, respostas que apenas apontam
+para outros recursos, repetição de frases, provável estouro de contexto, perguntas duplicadas e
+perguntas presentes em mais de um split. Ele gera `audit-summary.json`, `issues.jsonl`, `report.md`
+e `audit-manifest.json`. A estimativa de contexto usa quatro caracteres por token somente como
+triagem; o tokenizer do modelo continua sendo a fonte exata. Consulte
+[`docs/data/sft-audit.md`](docs/data/sft-audit.md).
+
+Depois de corrigir o isolamento na origem, aplique a curadoria conservadora em uma nova derivação:
+
+```powershell
+uv run tech-fine-tuning curate-sft `
+  --source "artifacts/sft-v2" `
+  --output "artifacts/sft-candidate-v2"
+```
+
+Ela remove somente texto não instrutivo por regras determinísticas, registra todos os excluídos e
+não sintetiza fatos médicos. Consulte
+[`docs/data/sft-curation.md`](docs/data/sft-curation.md).
+
 ## 2. Validar uma run sem GPU
 
 O perfil pequeno está em [`configs/qwen3-4b/smoke.toml`](configs/qwen3-4b/smoke.toml). Para validar
@@ -62,6 +98,20 @@ Por padrão, a execução local exige um commit identificável e um repositório
 experiência ainda não commitada, `--allow-dirty` libera somente essa proteção; a run continua
 registrando o commit atual.
 
+Para comparar somente o efeito dos dados curados, o candidato v2 mantém os mesmos hiperparâmetros
+do primeiro smoke test:
+
+```powershell
+uv run tech-fine-tuning train `
+  --config "configs/qwen3-4b/candidate-v2-smoke.toml" `
+  --source "artifacts/sft-candidate-v2" `
+  --output "artifacts/training/qwen3-4b-candidate-v2" `
+  --dry-run
+```
+
+Remova `--dry-run` somente depois que a auditoria do candidato e a procedência Git estiverem
+aprovadas.
+
 ## 3. Treinar localmente
 
 Instale o extra de GPU somente na máquina que fará treinamento:
@@ -73,7 +123,16 @@ uv run tech-fine-tuning train
 ```
 
 O extra fixa `unsloth==2026.8.22` no `uv.lock`. O diagnóstico mostra GPU, memória, driver, CUDA,
-BF16 e versões efetivas dos pacotes antes de permitir o treinamento.
+BF16 e versões efetivas dos pacotes antes de permitir o treinamento. Em Windows e Linux, `torch`
+e `torchvision` são obtidos do índice oficial `pytorch-cu130`; isso evita a instalação silenciosa
+do wheel `+cpu` disponível no PyPI comum.
+
+Depois de atualizar um checkout que já possuía a variante CPU, force a sincronização uma vez:
+
+```powershell
+uv sync --dev --extra training --locked --reinstall-package torch --reinstall-package torchvision
+uv run tech-fine-tuning diagnose --require-training
+```
 
 Para retomar uma interrupção:
 
@@ -85,7 +144,62 @@ uv run tech-fine-tuning train `
 O perfil completo está em [`configs/qwen3-4b/full.toml`](configs/qwen3-4b/full.toml) e só deve ser
 usado depois que o smoke test e a avaliação forem aprovados.
 
-## 4. Treinar com Docker
+## 4. Comparar o modelo base com o fine-tuned
+
+Depois que `train` terminar, faça primeiro uma avaliação pequena no split `validation`:
+
+```powershell
+uv run tech-fine-tuning evaluate `
+  --manifest "artifacts/training/qwen3-4b-smoke/model-manifest.json" `
+  --split validation `
+  --sample-size 20 `
+  --compare-base
+```
+
+No PowerShell, o acento grave `` ` `` deve ser o último caractere da linha. Não coloque `\`
+antes dele nem antes das opções. O comando verifica o adaptador e a procedência do dataset, escolhe
+uma amostra determinística e gera:
+
+```text
+artifacts/evaluation/qwen3-4b-smoke/validation/
+├── responses.jsonl          Respostas de referência, base e fine-tuned
+├── automatic-metrics.json   Latência, respostas vazias e token F1 auxiliar
+├── human-review.csv         Planilha para avaliação médica lado a lado
+└── evaluation-manifest.json Entradas, hashes, parâmetros e resumo da execução
+```
+
+O token F1 apenas sinaliza diferenças; ele não comprova correção clínica. Preencha a planilha de
+revisão sem olhar antecipadamente qual resposta venceu a métrica. Use `test` uma única vez, depois
+que configuração e critérios estiverem estabilizados, para a decisão final. O procedimento e os
+critérios estão em [`docs/training/evaluation.md`](docs/training/evaluation.md).
+
+O diretório de saída deve estar vazio. Para repetir uma experiência, informe outro `--output`, por
+exemplo `artifacts/evaluation/qwen3-4b-smoke/validation-v2`.
+
+Depois de preencher todas as notas, consolide a revisão em um diretório versionável separado dos
+artefatos reproduzíveis:
+
+```powershell
+uv run tech-fine-tuning summarize-review `
+  --review "artifacts/evaluation/qwen3-4b-smoke/validation/human-review.csv" `
+  --evaluation-manifest "artifacts/evaluation/qwen3-4b-smoke/validation/evaluation-manifest.json" `
+  --output "reports/evaluation/qwen3-4b-smoke-validation"
+```
+
+O comando valida notas, preferências e `record_id`, preserva a planilha preenchida e gera:
+
+```text
+reports/evaluation/qwen3-4b-smoke-validation/
+├── human-review-completed.csv  Revisão humana preservada
+├── human-review-summary.json   Métricas e resultado do quality gate
+├── decision.md                 Decisão legível e próximo passo
+└── review-manifest.json        Procedência e hashes dos arquivos
+```
+
+Uma decisão `rejected` impede o uso do split `test` e a publicação do adaptador. Nesse caso,
+corrija dados ou treinamento e repita a avaliação em `validation` com um novo diretório de saída.
+
+## 5. Treinar com Docker
 
 O contêiner usa a imagem CUDA oficial do Unsloth e recebe a revisão Git no build:
 
@@ -127,7 +241,7 @@ artifacts/training/qwen3-4b-smoke/
 ```
 
 O treinamento usa apenas `train` e `validation`. O split `test` permanece reservado para a
-avaliação final. Pesos, datasets, cache e checkpoints são ignorados pelo Git.
+avaliação final. Pesos, datasets, cache, checkpoints e saídas de avaliação são ignorados pelo Git.
 
 ## Configuração
 
@@ -137,6 +251,7 @@ As opções de treinamento ficam nos TOML versionados. Caminhos podem ser substi
 - `TECH_FINE_TUNING_SFT_OUTPUT_PATH`;
 - `TECH_FINE_TUNING_TRAINING_CONFIG_PATH`;
 - `TECH_FINE_TUNING_TRAINING_OUTPUT_PATH`;
+- `TECH_FINE_TUNING_EVALUATION_OUTPUT_PATH`;
 - `TECH_FINE_TUNING_REVISION` em imagens ou jobs sem checkout Git.
 
 Nunca grave tokens do Hugging Face, Azure ou Google nos perfis ou manifestos. Entregue-os pelo

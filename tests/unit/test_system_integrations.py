@@ -90,6 +90,7 @@ def test_environment_diagnostic_explains_unready_runtime(
     assert result.ready_for_training is False
     assert "Nenhuma GPU NVIDIA" in result.issues[0]
     assert any("unsloth" in issue for issue in result.issues)
+    assert any("pytorch-cu130" in issue for issue in result.issues)
     assert result.as_dict()["cuda"]["available"] is False
 
 
