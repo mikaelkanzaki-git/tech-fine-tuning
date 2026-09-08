@@ -11,15 +11,15 @@ que o modelo de 17B testado anteriormente e o perfil inicial limita o treinament
 
 ```text
 tech-ingestao/artifacts/dataset
-        │ prepare-sft
+        │ prepare-sft + validação de isolamento
         ▼
-artifacts/sft/{train,validation,test}.jsonl
-        │ audit-sft
+artifacts/sft-v2/{train,validation,test}.jsonl
+        │ audit-sft + nova instrução segura e concisa
         ├──────────────► reports/data-quality/<auditoria>
         │ curate-sft
         ▼
-artifacts/sft-candidate-v2/{train,validation,test}.jsonl
-        │ audit-sft + train + perfil TOML
+artifacts/sft-candidate-v3/{train,validation,test}.jsonl
+        │ audit-sft + amostragem balanceada + train
         ▼
 artifacts/training/<run>/{adapter,checkpoints,manifestos}
         │ evaluate
@@ -78,12 +78,17 @@ Depois de corrigir o isolamento na origem, aplique a curadoria conservadora em u
 ```powershell
 uv run tech-fine-tuning curate-sft `
   --source "artifacts/sft-v2" `
-  --output "artifacts/sft-candidate-v2"
+  --output "artifacts/sft-candidate-v3" `
+  --system-prompt "You are a medical information assistant. Answer only the question asked with concise educational information grounded in reliable medical sources. If reliable information is unavailable, say that it is unknown instead of inventing details. Do not prescribe medication, diagnose a patient, or replace a qualified healthcare professional."
 ```
 
 Ela remove somente texto não instrutivo por regras determinísticas, registra todos os excluídos e
 não sintetiza fatos médicos. Consulte
 [`docs/data/sft-curation.md`](docs/data/sft-curation.md).
+
+O candidato v3 parte do `sft-v2`, o snapshot que já eliminou perguntas repetidas entre splits. A
+opção `--system-prompt` troca apenas a mensagem de sistema, sem reescrever as respostas médicas, e
+registra o novo texto e seu SHA-256 no manifesto derivado.
 
 ## 2. Validar uma run sem GPU
 
@@ -98,16 +103,20 @@ Por padrão, a execução local exige um commit identificável e um repositório
 experiência ainda não commitada, `--allow-dirty` libera somente essa proteção; a run continua
 registrando o commit atual.
 
-Para comparar somente o efeito dos dados curados, o candidato v2 mantém os mesmos hiperparâmetros
-do primeiro smoke test:
+O candidato v3 mantém o Qwen3-4B e os hiperparâmetros do smoke test, mas seleciona os 1.000
+exemplos de maneira determinística e equilibrada entre as coleções do MedQuAD:
 
 ```powershell
 uv run tech-fine-tuning train `
-  --config "configs/qwen3-4b/candidate-v2-smoke.toml" `
-  --source "artifacts/sft-candidate-v2" `
-  --output "artifacts/training/qwen3-4b-candidate-v2" `
+  --config "configs/qwen3-4b/candidate-v3-smoke.toml" `
+  --source "artifacts/sft-candidate-v3" `
+  --output "artifacts/training/qwen3-4b-candidate-v3" `
   --dry-run
 ```
+
+O perfil registra `sampling_strategy = "balanced_by_source"`. A run também grava, para treino e
+validação, quantos exemplos estavam disponíveis e quantos foram efetivamente selecionados por
+coleção. Perfis antigos sem essa opção continuam usando `head` para preservar reprodutibilidade.
 
 Remova `--dry-run` somente depois que a auditoria do candidato e a procedência Git estiverem
 aprovadas.
@@ -119,7 +128,10 @@ Instale o extra de GPU somente na máquina que fará treinamento:
 ```powershell
 uv sync --dev --extra training --locked
 uv run tech-fine-tuning diagnose --require-training
-uv run tech-fine-tuning train
+uv run tech-fine-tuning train `
+  --config "configs/qwen3-4b/candidate-v3-smoke.toml" `
+  --source "artifacts/sft-candidate-v3" `
+  --output "artifacts/training/qwen3-4b-candidate-v3"
 ```
 
 O extra fixa `unsloth==2026.8.22` no `uv.lock`. O diagnóstico mostra GPU, memória, driver, CUDA,
@@ -138,7 +150,10 @@ Para retomar uma interrupção:
 
 ```powershell
 uv run tech-fine-tuning train `
-  --resume-from-checkpoint artifacts/training/qwen3-4b-smoke/checkpoints/checkpoint-40
+  --config "configs/qwen3-4b/candidate-v3-smoke.toml" `
+  --source "artifacts/sft-candidate-v3" `
+  --output "artifacts/training/qwen3-4b-candidate-v3" `
+  --resume-from-checkpoint artifacts/training/qwen3-4b-candidate-v3/checkpoints/checkpoint-40
 ```
 
 O perfil completo está em [`configs/qwen3-4b/full.toml`](configs/qwen3-4b/full.toml) e só deve ser
@@ -150,7 +165,9 @@ Depois que `train` terminar, faça primeiro uma avaliação pequena no split `va
 
 ```powershell
 uv run tech-fine-tuning evaluate `
-  --manifest "artifacts/training/qwen3-4b-smoke/model-manifest.json" `
+  --manifest "artifacts/training/qwen3-4b-candidate-v3/model-manifest.json" `
+  --source "artifacts/sft-candidate-v3" `
+  --output "artifacts/evaluation/qwen3-4b-candidate-v3/sampling-validation" `
   --split validation `
   --sample-size 20 `
   --compare-base
@@ -161,12 +178,17 @@ antes dele nem antes das opções. O comando verifica o adaptador e a procedênc
 uma amostra determinística e gera:
 
 ```text
-artifacts/evaluation/qwen3-4b-smoke/validation/
+artifacts/evaluation/qwen3-4b-candidate-v3/sampling-validation/
 ├── responses.jsonl          Respostas de referência, base e fine-tuned
 ├── automatic-metrics.json   Latência, respostas vazias e token F1 auxiliar
 ├── human-review.csv         Planilha para avaliação médica lado a lado
 └── evaluation-manifest.json Entradas, hashes, parâmetros e resumo da execução
 ```
+
+A avaliação usa por padrão a amostragem recomendada para o Qwen3 Instruct (`temperature=0.7`,
+`top_p=0.8` e `top_k=20`) e `repetition_penalty=1.1`. A semente de cada pergunta é reaplicada no
+modelo base e no fine-tuned, tornando a comparação reproduzível. Use `--greedy` apenas para
+diagnóstico; todos os parâmetros efetivos ficam registrados no manifesto.
 
 O token F1 apenas sinaliza diferenças; ele não comprova correção clínica. Preencha a planilha de
 revisão sem olhar antecipadamente qual resposta venceu a métrica. Use `test` uma única vez, depois
@@ -174,22 +196,22 @@ que configuração e critérios estiverem estabilizados, para a decisão final. 
 critérios estão em [`docs/training/evaluation.md`](docs/training/evaluation.md).
 
 O diretório de saída deve estar vazio. Para repetir uma experiência, informe outro `--output`, por
-exemplo `artifacts/evaluation/qwen3-4b-smoke/validation-v2`.
+exemplo `artifacts/evaluation/qwen3-4b-candidate-v3/sampling-validation-v2`.
 
 Depois de preencher todas as notas, consolide a revisão em um diretório versionável separado dos
 artefatos reproduzíveis:
 
 ```powershell
 uv run tech-fine-tuning summarize-review `
-  --review "artifacts/evaluation/qwen3-4b-smoke/validation/human-review.csv" `
-  --evaluation-manifest "artifacts/evaluation/qwen3-4b-smoke/validation/evaluation-manifest.json" `
-  --output "reports/evaluation/qwen3-4b-smoke-validation"
+  --review "artifacts/evaluation/qwen3-4b-candidate-v3/sampling-validation/human-review.csv" `
+  --evaluation-manifest "artifacts/evaluation/qwen3-4b-candidate-v3/sampling-validation/evaluation-manifest.json" `
+  --output "reports/evaluation/qwen3-4b-candidate-v3-validation"
 ```
 
 O comando valida notas, preferências e `record_id`, preserva a planilha preenchida e gera:
 
 ```text
-reports/evaluation/qwen3-4b-smoke-validation/
+reports/evaluation/qwen3-4b-candidate-v3-validation/
 ├── human-review-completed.csv  Revisão humana preservada
 ├── human-review-summary.json   Métricas e resultado do quality gate
 ├── decision.md                 Decisão legível e próximo passo
@@ -233,7 +255,7 @@ Os passos de publicação da imagem, armazenamento e retomada estão em
 ## Artefatos de saída
 
 ```text
-artifacts/training/qwen3-4b-smoke/
+artifacts/training/qwen3-4b-candidate-v3/
 ├── adapter/                 Adaptador PEFT e tokenizer
 ├── checkpoints/             Pontos de retomada
 ├── run-manifest.json        Configuração, ambiente, métricas e status

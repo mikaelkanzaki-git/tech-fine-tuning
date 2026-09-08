@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+DatasetSamplingStrategy = Literal["head", "balanced_by_source"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +65,7 @@ class DatasetTrainingConfig:
 
     train_limit: int | None
     validation_limit: int | None
+    sampling_strategy: DatasetSamplingStrategy
     num_proc: int
     train_on_responses_only: bool
 
@@ -70,6 +73,7 @@ class DatasetTrainingConfig:
         return {
             "train_limit": self.train_limit,
             "validation_limit": self.validation_limit,
+            "sampling_strategy": self.sampling_strategy,
             "num_proc": self.num_proc,
             "train_on_responses_only": self.train_on_responses_only,
         }

@@ -10,6 +10,7 @@ from typing import Any
 
 from tech_fine_tuning.errors import TrainingConfigurationError
 from tech_fine_tuning.models.training import (
+    DatasetSamplingStrategy,
     DatasetTrainingConfig,
     LoraTrainingConfig,
     ModelTrainingConfig,
@@ -19,6 +20,7 @@ from tech_fine_tuning.models.training import (
 
 TRAINING_CONFIG_SCHEMA_VERSION = "1.0"
 _REVISION = re.compile(r"^[0-9a-f]{7,64}$")
+_DATASET_SAMPLING_STRATEGIES = {"head", "balanced_by_source"}
 
 
 def _mapping(data: Mapping[str, Any], field: str, *, context: str) -> Mapping[str, Any]:
@@ -67,6 +69,20 @@ def _optional_positive_integer(
     if value <= 0:
         raise TrainingConfigurationError(f"{context}: campo {field!r} deve ser positivo.")
     return value
+
+
+def _dataset_sampling_strategy(
+    data: Mapping[str, Any], *, context: str
+) -> DatasetSamplingStrategy:
+    value = data.get("sampling_strategy", "head")
+    if value == "head":
+        return "head"
+    if value == "balanced_by_source":
+        return "balanced_by_source"
+    allowed = ", ".join(sorted(_DATASET_SAMPLING_STRATEGIES))
+    raise TrainingConfigurationError(
+        f"{context}: campo 'sampling_strategy' deve ser um de: {allowed}."
+    )
 
 
 def _number(
@@ -213,7 +229,13 @@ def read_training_config(path: Path) -> TrainingConfig:
     dataset_context = f"{context}, seção dataset"
     _reject_unknown(
         dataset_data,
-        {"train_limit", "validation_limit", "num_proc", "train_on_responses_only"},
+        {
+            "train_limit",
+            "validation_limit",
+            "sampling_strategy",
+            "num_proc",
+            "train_on_responses_only",
+        },
         context=dataset_context,
     )
     num_proc = _integer(dataset_data, "num_proc", context=dataset_context, default=1)
@@ -225,6 +247,10 @@ def read_training_config(path: Path) -> TrainingConfig:
         ),
         validation_limit=_optional_positive_integer(
             dataset_data, "validation_limit", context=dataset_context
+        ),
+        sampling_strategy=_dataset_sampling_strategy(
+            dataset_data,
+            context=dataset_context,
         ),
         num_proc=num_proc,
         train_on_responses_only=_boolean(

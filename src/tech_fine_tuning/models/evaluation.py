@@ -39,6 +39,11 @@ class EvaluationPlan:
     max_sequence_length: int
     load_in_4bit: bool
     max_new_tokens: int
+    do_sample: bool
+    temperature: float
+    top_p: float
+    top_k: int
+    repetition_penalty: float
     examples: tuple[EvaluationExample, ...]
 
     def as_dict(self) -> dict[str, Any]:
@@ -57,6 +62,13 @@ class EvaluationPlan:
                 "seed": self.seed,
                 "compare_base": self.compare_base,
                 "max_new_tokens": self.max_new_tokens,
+                "generation": {
+                    "do_sample": self.do_sample,
+                    "temperature": self.temperature,
+                    "top_p": self.top_p,
+                    "top_k": self.top_k,
+                    "repetition_penalty": self.repetition_penalty,
+                },
             },
             "model": {
                 "id": self.model_id,

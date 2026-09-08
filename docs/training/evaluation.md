@@ -20,6 +20,14 @@ A seleção é determinística para a combinação de `--seed` e `record_id`. As
 podem ser comparadas com as mesmas perguntas. `--compare-base` gera duas respostas por exemplo e,
 portanto, leva aproximadamente o dobro do tempo da inferência apenas com o adaptador.
 
+Por padrão, a geração usa amostragem com `temperature=0.7`, `top_p=0.8` e `top_k=20`, seguindo a
+configuração recomendada para o Qwen3 Instruct, além de `repetition_penalty=1.1` para reduzir
+repetições degenerativas. Cada pergunta recebe uma semente reproduzível, usada tanto no modelo
+base quanto no fine-tuned. Os parâmetros ficam registrados em `evaluation-manifest.json`.
+
+Use `--greedy` somente como diagnóstico para desativar a amostragem. Os parâmetros podem ser
+alterados explicitamente com `--temperature`, `--top-p`, `--top-k` e `--repetition-penalty`.
+
 ## Revisão humana
 
 Abra `human-review.csv` e atribua de 0 a 2 para cada resposta:

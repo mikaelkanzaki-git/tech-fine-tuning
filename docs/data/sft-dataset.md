@@ -63,6 +63,11 @@ O `manifest.json` SFT registra:
 - SHA-256 dos arquivos SFT gerados;
 - resultado das verificações de vazamento.
 
+A instrução padrão solicita uma resposta concisa e limitada à pergunta. Quando a fonte não sustenta
+um detalhe, o modelo deve declarar que a informação é desconhecida em vez de inventá-la. Uma
+instrução diferente pode ser fornecida com `--system-prompt`; em ambos os casos, o texto efetivo
+fica incorporado aos exemplos e ao manifesto.
+
 O arquivo de mensagens ainda é independente de modelo. Depois que o modelo base for escolhido,
 o carregador de treinamento aplicará `tokenizer.apply_chat_template` em memória e registrará o
 nome e a revisão do tokenizer no manifesto do treinamento.

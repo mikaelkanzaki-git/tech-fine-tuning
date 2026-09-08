@@ -10,6 +10,7 @@ from tech_fine_tuning.integrations.training.config_reader import read_training_c
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SMOKE_CONFIG = PROJECT_ROOT / "configs" / "qwen3-4b" / "smoke.toml"
 FULL_CONFIG = PROJECT_ROOT / "configs" / "qwen3-4b" / "full.toml"
+CANDIDATE_V3_CONFIG = PROJECT_ROOT / "configs" / "qwen3-4b" / "candidate-v3-smoke.toml"
 
 
 def _changed_config(tmp_path: Path, old: str, new: str) -> Path:
@@ -23,11 +24,14 @@ def _changed_config(tmp_path: Path, old: str, new: str) -> Path:
 def test_reads_smoke_and_full_profiles() -> None:
     smoke = read_training_config(SMOKE_CONFIG)
     full = read_training_config(FULL_CONFIG)
+    candidate_v3 = read_training_config(CANDIDATE_V3_CONFIG)
 
     assert smoke.run_name == "qwen3-4b-medquad-smoke"
     assert smoke.model.load_in_4bit is True
     assert smoke.lora.target_modules[0] == "q_proj"
     assert smoke.dataset.train_limit == 1000
+    assert smoke.dataset.sampling_strategy == "head"
+    assert candidate_v3.dataset.sampling_strategy == "balanced_by_source"
     assert smoke.trainer.max_steps == 50
     assert full.dataset.train_limit is None
     assert full.trainer.num_train_epochs == 1.0
@@ -56,6 +60,11 @@ def test_reads_smoke_and_full_profiles() -> None:
             "deve ser uma lista",
         ),
         ("train_limit = 1000", "train_limit = 0", "deve ser positivo"),
+        (
+            "train_limit = 1000",
+            'train_limit = 1000\nsampling_strategy = "random"',
+            "sampling_strategy",
+        ),
         ("num_proc = 2", "num_proc = 0", "num_proc deve ser positivo"),
         (
             "max_steps = 50",

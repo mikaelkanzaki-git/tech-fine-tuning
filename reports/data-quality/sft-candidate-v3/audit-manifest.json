@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-09-07T23:50:53.612639+00:00",
+  "inputs_sha256": {
+    "sft_manifest": "91f1be1f0a7511714f55b1a6c75c6e30e3ad05068e35e04216a9427cb69925d9",
+    "test": "852212ce12e0a0f078b0df09f6ae426fb236d2d02f6d979003619a071f98626d",
+    "train": "13db7ca38f3ec82dd29b3083f14c8c176a4368c789ce4b2bb560dce6f851236e",
+    "validation": "580b97834fcddbc0e34ef443a5bbc4ff48cf5b14a47686c356ccfa58efa739fc"
+  },
+  "outputs_sha256": {
+    "issues": "101e8783b34a63a146f7781fb73acfa37f3aa60e952be8cb2c25e25120765009",
+    "report": "0a5d8e752e4072fb342aee0a47afe3e31c54f8c0c6bba2d9dbb488c586b86e0f",
+    "summary": "7215c550c6b9a9f33336013f59b07b2d16305729c065c93b174eae0089defd01"
+  },
+  "schema_version": "1.0",
+  "status": "completed"
+}

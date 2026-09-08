@@ -1,0 +1,72 @@
+{
+  "cross_split_normalized_question_overlap": {
+    "train_test": 0,
+    "train_validation": 0,
+    "validation_test": 0
+  },
+  "examples": 15290,
+  "issue_counts": {
+    "answer_repeats_question": 5,
+    "duplicate_answer_within_split": 578,
+    "duplicate_question_within_split": 3013,
+    "estimated_context_overflow": 157,
+    "repeated_sentence": 90
+  },
+  "max_sequence_length": 2048,
+  "records_with_issues": 3665,
+  "schema_version": "1.0",
+  "splits": {
+    "test": {
+      "answer_chars": {
+        "maximum": 26980,
+        "p50": 826,
+        "p95": 3361,
+        "p99": 9071
+      },
+      "examples": 1389,
+      "issue_counts": {
+        "answer_repeats_question": 1,
+        "duplicate_answer_within_split": 44,
+        "duplicate_question_within_split": 288,
+        "estimated_context_overflow": 21,
+        "repeated_sentence": 9
+      },
+      "records_with_issues": 342
+    },
+    "train": {
+      "answer_chars": {
+        "maximum": 24668,
+        "p50": 824,
+        "p95": 3102,
+        "p99": 7763
+      },
+      "examples": 12444,
+      "issue_counts": {
+        "answer_repeats_question": 2,
+        "duplicate_answer_within_split": 476,
+        "duplicate_question_within_split": 2459,
+        "estimated_context_overflow": 123,
+        "repeated_sentence": 75
+      },
+      "records_with_issues": 2993
+    },
+    "validation": {
+      "answer_chars": {
+        "maximum": 21381,
+        "p50": 830,
+        "p95": 3211,
+        "p99": 6636
+      },
+      "examples": 1457,
+      "issue_counts": {
+        "answer_repeats_question": 2,
+        "duplicate_answer_within_split": 58,
+        "duplicate_question_within_split": 266,
+        "estimated_context_overflow": 13,
+        "repeated_sentence": 6
+      },
+      "records_with_issues": 330
+    }
+  },
+  "token_estimate": "ceil(total_message_characters / 4)"
+}
