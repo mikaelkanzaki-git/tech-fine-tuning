@@ -88,9 +88,51 @@ def test_plan_validates_provenance_and_selects_a_deterministic_sample(tmp_path: 
 
     assert plan.model_id == "unsloth/model-bnb-4bit"
     assert plan.load_in_4bit is True
+    assert plan.do_sample is True
+    assert plan.temperature == 0.7
+    assert plan.top_p == 0.8
+    assert plan.top_k == 20
+    assert plan.repetition_penalty == 1.1
     assert plan.adapter_path.name == "adapter"
     assert len(plan.examples) == 2
     assert plan.as_dict()["record_ids"] == [example.record_id for example in plan.examples]
+    assert plan.as_dict()["evaluation"]["generation"] == {
+        "do_sample": True,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "repetition_penalty": 1.1,
+    }
+
+
+@pytest.mark.parametrize(
+    "generation_options",
+    [
+        {"temperature": 0},
+        {"top_p": 0},
+        {"top_p": 1.1},
+        {"top_k": 0},
+        {"repetition_penalty": 0.9},
+    ],
+)
+def test_plan_rejects_invalid_generation_parameters(
+    tmp_path: Path,
+    generation_options: dict[str, Any],
+) -> None:
+    model_manifest_path, dataset_path = _evaluation_fixture(tmp_path)
+
+    with pytest.raises(EvaluationPreflightError, match="Parâmetros de geração inválidos"):
+        build_evaluation_plan(
+            model_manifest_path=model_manifest_path,
+            dataset_path=dataset_path,
+            output_path=tmp_path / "evaluation",
+            split="validation",
+            sample_size=1,
+            seed=1,
+            compare_base=True,
+            max_new_tokens=8,
+            **generation_options,
+        )
 
 
 def test_evaluation_writes_comparison_metrics_and_human_review(tmp_path: Path) -> None:

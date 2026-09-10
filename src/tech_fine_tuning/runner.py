@@ -114,6 +114,15 @@ def _build_parser(settings: Settings) -> argparse.ArgumentParser:
     evaluate_parser.add_argument("--sample-size", type=int, default=20)
     evaluate_parser.add_argument("--seed", type=int, default=3407)
     evaluate_parser.add_argument("--max-new-tokens", type=int, default=256)
+    evaluate_parser.add_argument("--temperature", type=float, default=0.7)
+    evaluate_parser.add_argument("--top-p", type=float, default=0.8)
+    evaluate_parser.add_argument("--top-k", type=int, default=20)
+    evaluate_parser.add_argument("--repetition-penalty", type=float, default=1.1)
+    evaluate_parser.add_argument(
+        "--greedy",
+        action="store_true",
+        help="Usa decodificação gulosa em vez da amostragem recomendada pelo Qwen.",
+    )
     evaluate_parser.add_argument(
         "--compare-base",
         action="store_true",
@@ -179,6 +188,10 @@ def _build_parser(settings: Settings) -> argparse.ArgumentParser:
         required=True,
         help="Diretório novo ou vazio para o dataset curado.",
     )
+    curate_parser.add_argument(
+        "--system-prompt",
+        help="Substitui explicitamente a instrução de sistema em todos os exemplos.",
+    )
     return parser
 
 
@@ -239,6 +252,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 seed=arguments.seed,
                 compare_base=arguments.compare_base,
                 max_new_tokens=arguments.max_new_tokens,
+                do_sample=not arguments.greedy,
+                temperature=arguments.temperature,
+                top_p=arguments.top_p,
+                top_k=arguments.top_k,
+                repetition_penalty=arguments.repetition_penalty,
             )
             print(
                 json.dumps(
@@ -283,6 +301,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             curation_outcome = curate_sft_dataset(
                 source_path=arguments.source,
                 output_path=arguments.output,
+                system_prompt=arguments.system_prompt,
             )
             print(
                 json.dumps(

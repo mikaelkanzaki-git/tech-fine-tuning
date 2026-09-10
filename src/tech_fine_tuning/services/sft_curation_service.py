@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from collections import Counter
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -122,6 +123,7 @@ def _curate_record(
     raw_record: Mapping[str, Any],
     *,
     split: SplitName,
+    system_prompt: str | None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, tuple[str, ...]]:
     record = copy.deepcopy(dict(raw_record))
     messages = cast(list[dict[str, Any]], record["messages"])
@@ -130,6 +132,9 @@ def _curate_record(
     metadata = cast(dict[str, Any], record["metadata"])
     record_id = cast(str, metadata["record_id"])
     transformations: list[str] = []
+
+    if system_prompt is not None:
+        messages[0]["content"] = system_prompt
 
     answer, question_removed = _remove_leading_question(question, answer)
     if question_removed:
@@ -174,16 +179,33 @@ def _cross_split_question_overlap(
     )
 
 
-def curate_sft_dataset(source_path: Path, output_path: Path) -> SftCurationOutcome:
+def curate_sft_dataset(
+    source_path: Path,
+    output_path: Path,
+    *,
+    system_prompt: str | None = None,
+) -> SftCurationOutcome:
     """Remove respostas não instrutivas e boilerplate sem sintetizar fatos médicos."""
 
     source_path = source_path.expanduser().resolve()
     output_path = output_path.expanduser().resolve()
+    if system_prompt is not None:
+        system_prompt = system_prompt.strip()
+        if not system_prompt:
+            raise SftCurationValidationError("A nova instrução de sistema não pode ser vazia.")
     if source_path == output_path:
         raise SftCurationValidationError("Origem e saída da curadoria devem ser diferentes.")
     if output_path.exists() and any(output_path.iterdir()):
         raise SftCurationValidationError(f"O diretório de saída não está vazio: {output_path}")
     source_manifest, records_by_split = _validate_source(source_path)
+    format_data = copy.deepcopy(source_manifest.get("format"))
+    if not isinstance(format_data, dict):
+        raise SftCurationValidationError("manifest.format deve ser um objeto.")
+    if system_prompt is not None:
+        format_data["system_prompt"] = system_prompt
+        format_data["system_prompt_sha256"] = hashlib.sha256(
+            system_prompt.encode("utf-8")
+        ).hexdigest()
 
     curated_by_split: dict[SplitName, tuple[dict[str, Any], ...]] = {}
     excluded: list[dict[str, Any]] = []
@@ -193,7 +215,9 @@ def curate_sft_dataset(source_path: Path, output_path: Path) -> SftCurationOutco
         curated: list[dict[str, Any]] = []
         for record in records:
             curated_record, excluded_record, transformations = _curate_record(
-                record, split=split
+                record,
+                split=split,
+                system_prompt=system_prompt,
             )
             transformation_counts.update(transformations)
             if excluded_record is not None:
@@ -236,10 +260,11 @@ def curate_sft_dataset(source_path: Path, output_path: Path) -> SftCurationOutco
                     split: file_sha256(source_path / f"{split}.jsonl") for split in SPLITS
                 },
             },
-            "format": source_manifest.get("format"),
+            "format": format_data,
             "curation": {
                 "profile": CURATION_PROFILE,
                 "medical_text_policy": "remove_only_no_medical_facts_synthesized",
+                "system_prompt_replaced": system_prompt is not None,
                 "rules": [
                     "remove_exact_leading_question",
                     "exclude_resource_navigation_answer",

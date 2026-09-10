@@ -146,6 +146,11 @@ def build_evaluation_plan(
     seed: int,
     compare_base: bool,
     max_new_tokens: int,
+    do_sample: bool = True,
+    temperature: float = 0.7,
+    top_p: float = 0.8,
+    top_k: int = 20,
+    repetition_penalty: float = 1.1,
 ) -> EvaluationPlan:
     """Valida manifestos, hashes, adaptador e amostra sem carregar a GPU."""
 
@@ -153,6 +158,17 @@ def build_evaluation_plan(
         raise EvaluationPreflightError("Somente validation ou test podem ser avaliados.")
     if sample_size <= 0 or max_new_tokens <= 0:
         raise EvaluationPreflightError("sample-size e max-new-tokens devem ser positivos.")
+    invalid_sampling = (
+        temperature <= 0
+        or not 0 < top_p <= 1
+        or top_k <= 0
+        or repetition_penalty < 1
+    )
+    if invalid_sampling:
+        raise EvaluationPreflightError(
+            "Parâmetros de geração inválidos: temperature > 0, top-p em (0, 1], "
+            "top-k > 0 e repetition-penalty >= 1."
+        )
     model_manifest_path = model_manifest_path.expanduser().resolve()
     dataset_path = dataset_path.expanduser().resolve()
     output_path = output_path.expanduser().resolve()
@@ -220,6 +236,11 @@ def build_evaluation_plan(
         ),
         load_in_4bit=_boolean(model_data, "load_in_4bit", context="manifesto da run"),
         max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        repetition_penalty=repetition_penalty,
         examples=examples,
     )
 
@@ -356,6 +377,11 @@ def execute_evaluation(
     seed: int,
     compare_base: bool,
     max_new_tokens: int,
+    do_sample: bool = True,
+    temperature: float = 0.7,
+    top_p: float = 0.8,
+    top_k: int = 20,
+    repetition_penalty: float = 1.1,
     backend: EvaluationBackend = run_unsloth_evaluation,
 ) -> EvaluationOutcome:
     """Gera respostas, métricas auxiliares e planilha de revisão humana."""
@@ -369,6 +395,11 @@ def execute_evaluation(
         seed=seed,
         compare_base=compare_base,
         max_new_tokens=max_new_tokens,
+        do_sample=do_sample,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        repetition_penalty=repetition_penalty,
     )
     generated = backend(plan)
     records = _response_records(plan, generated)

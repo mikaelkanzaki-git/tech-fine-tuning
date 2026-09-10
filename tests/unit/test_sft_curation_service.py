@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -107,6 +108,36 @@ def test_curation_removes_non_instructional_text_with_traceability(tmp_path: Pat
     assert manifest["curation"]["medical_text_policy"] == (
         "remove_only_no_medical_facts_synthesized"
     )
+    assert manifest["curation"]["system_prompt_replaced"] is False
+
+
+def test_curation_can_replace_the_system_prompt_with_traceability(tmp_path: Path) -> None:
+    source = _write_sft(tmp_path)
+    prompt = "Answer concisely and do not invent details."
+
+    outcome = curate_sft_dataset(
+        source,
+        tmp_path / "curated",
+        system_prompt=prompt,
+    )
+
+    train = json.loads((outcome.output_path / "train.jsonl").read_text(encoding="utf-8"))
+    manifest = json.loads(outcome.manifest_path.read_text(encoding="utf-8"))
+    assert train["messages"][0]["content"] == prompt
+    assert manifest["format"]["system_prompt"] == prompt
+    assert manifest["format"]["system_prompt_sha256"] == hashlib.sha256(
+        prompt.encode("utf-8")
+    ).hexdigest()
+    assert manifest["curation"]["system_prompt_replaced"] is True
+
+
+def test_curation_rejects_an_empty_system_prompt(tmp_path: Path) -> None:
+    with pytest.raises(SftCurationValidationError, match="não pode ser vazia"):
+        curate_sft_dataset(
+            _write_sft(tmp_path),
+            tmp_path / "curated",
+            system_prompt=" ",
+        )
 
 
 def test_curation_rejects_cross_split_questions(tmp_path: Path) -> None:

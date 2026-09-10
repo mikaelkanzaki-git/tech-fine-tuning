@@ -76,6 +76,14 @@ def test_evaluate_command_forwards_comparison_options(
             "validation",
             "--sample-size",
             "20",
+            "--temperature",
+            "0.6",
+            "--top-p",
+            "0.75",
+            "--top-k",
+            "16",
+            "--repetition-penalty",
+            "1.15",
             "--compare-base",
         ]
     )
@@ -84,6 +92,11 @@ def test_evaluate_command_forwards_comparison_options(
     assert captured["sample_size"] == 20
     assert captured["split"] == "validation"
     assert captured["compare_base"] is True
+    assert captured["do_sample"] is True
+    assert captured["temperature"] == 0.6
+    assert captured["top_p"] == 0.75
+    assert captured["top_k"] == 16
+    assert captured["repetition_penalty"] == 1.15
 
 
 def test_summarize_review_command_forwards_paths(
@@ -191,4 +204,8 @@ def test_curate_sft_command_forwards_paths(
     )
 
     assert exit_code == 0
-    assert captured == {"source_path": source, "output_path": output}
+    assert captured == {
+        "source_path": source,
+        "output_path": output,
+        "system_prompt": None,
+    }

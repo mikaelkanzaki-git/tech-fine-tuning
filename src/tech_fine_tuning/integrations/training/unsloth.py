@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import time
 from collections.abc import Mapping
@@ -12,12 +13,20 @@ from tech_fine_tuning.errors import (
     TrainingDependencyError,
     TrainingExecutionError,
 )
+from tech_fine_tuning.integrations.dataset.sampling import (
+    selection_indices,
+    source_distribution,
+)
 from tech_fine_tuning.models.evaluation import (
     EvaluationExample,
     EvaluationPlan,
     GeneratedComparison,
 )
-from tech_fine_tuning.models.training import BackendTrainingResult, TrainingPlan
+from tech_fine_tuning.models.training import (
+    BackendTrainingResult,
+    DatasetSamplingStrategy,
+    TrainingPlan,
+)
 
 
 def _module(name: str) -> Any:
@@ -30,10 +39,26 @@ def _module(name: str) -> Any:
         ) from error
 
 
-def _limited(dataset: Any, limit: int | None) -> Any:
-    if limit is None or limit >= len(dataset):
-        return dataset
-    return dataset.select(range(limit))
+def _select_dataset(
+    dataset: Any,
+    *,
+    limit: int | None,
+    strategy: DatasetSamplingStrategy,
+    seed: int,
+) -> tuple[Any, dict[str, Any]]:
+    indices = selection_indices(
+        dataset,
+        limit=limit,
+        strategy=strategy,
+        seed=seed,
+    )
+    selected = dataset if indices is None else dataset.select(indices)
+    return selected, {
+        "available_examples": len(dataset),
+        "selected_examples": len(selected),
+        "available_by_source": source_distribution(dataset),
+        "selected_by_source": source_distribution(selected),
+    }
 
 
 def _serializable_metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
@@ -97,9 +122,17 @@ def run_unsloth_training(plan: TrainingPlan) -> BackendTrainingResult:
         validation_dataset = datasets.load_dataset(
             "json", data_files=str(plan.validation_path), split="train"
         )
-        train_dataset = _limited(train_dataset, config.dataset.train_limit)
-        validation_dataset = _limited(
-            validation_dataset, config.dataset.validation_limit
+        train_dataset, train_selection = _select_dataset(
+            train_dataset,
+            limit=config.dataset.train_limit,
+            strategy=config.dataset.sampling_strategy,
+            seed=config.trainer.seed,
+        )
+        validation_dataset, validation_selection = _select_dataset(
+            validation_dataset,
+            limit=config.dataset.validation_limit,
+            strategy=config.dataset.sampling_strategy,
+            seed=config.trainer.seed,
         )
 
         def format_messages(batch: Mapping[str, list[Any]]) -> dict[str, list[str]]:
@@ -173,6 +206,12 @@ def run_unsloth_training(plan: TrainingPlan) -> BackendTrainingResult:
             )
         )
         metrics = {
+            "dataset_selection": {
+                "strategy": config.dataset.sampling_strategy,
+                "seed": config.trainer.seed,
+                "train": train_selection,
+                "validation": validation_selection,
+            },
             "train": _serializable_metrics(train_result.metrics),
             "validation": _serializable_metrics(trainer.evaluate()),
         }
@@ -199,6 +238,12 @@ def _generate_answer(
     tokenizer: Any,
     example: EvaluationExample,
     max_new_tokens: int,
+    do_sample: bool,
+    temperature: float,
+    top_p: float,
+    top_k: int,
+    repetition_penalty: float,
+    generation_seed: int,
     torch: Any,
 ) -> tuple[str, float]:
     inputs = tokenizer.apply_chat_template(
@@ -215,12 +260,26 @@ def _generate_answer(
     original_max_length = generation_config.max_length
     generation_config.max_length = None
     try:
+        torch.manual_seed(generation_seed)
+        torch.cuda.manual_seed_all(generation_seed)
+        generation_arguments: dict[str, Any] = {
+            "max_new_tokens": max_new_tokens,
+            "do_sample": do_sample,
+            "repetition_penalty": repetition_penalty,
+            "use_cache": True,
+        }
+        if do_sample:
+            generation_arguments.update(
+                {
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                }
+            )
         with torch.inference_mode():
             generated = model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                use_cache=True,
+                **generation_arguments,
             )
     finally:
         generation_config.max_length = original_max_length
@@ -231,6 +290,11 @@ def _generate_answer(
         skip_special_tokens=True,
     )[0].strip()
     return answer, round(latency, 4)
+
+
+def _generation_seed(seed: int, record_id: str) -> int:
+    digest = hashlib.sha256(f"{seed}:{record_id}".encode()).digest()
+    return int.from_bytes(digest[:4], byteorder="big", signed=False)
 
 
 def run_unsloth_evaluation(plan: EvaluationPlan) -> tuple[GeneratedComparison, ...]:
@@ -261,11 +325,18 @@ def run_unsloth_evaluation(plan: EvaluationPlan) -> tuple[GeneratedComparison, .
         base_results: dict[str, tuple[str, float]] = {}
         if plan.compare_base:
             for example in plan.examples:
+                generation_seed = _generation_seed(plan.seed, example.record_id)
                 base_results[example.record_id] = _generate_answer(
                     model=model,
                     tokenizer=tokenizer,
                     example=example,
                     max_new_tokens=plan.max_new_tokens,
+                    do_sample=plan.do_sample,
+                    temperature=plan.temperature,
+                    top_p=plan.top_p,
+                    top_k=plan.top_k,
+                    repetition_penalty=plan.repetition_penalty,
+                    generation_seed=generation_seed,
                     torch=torch,
                 )
 
@@ -277,11 +348,18 @@ def run_unsloth_evaluation(plan: EvaluationPlan) -> tuple[GeneratedComparison, .
         unsloth.FastLanguageModel.for_inference(model)
         comparisons: list[GeneratedComparison] = []
         for example in plan.examples:
+            generation_seed = _generation_seed(plan.seed, example.record_id)
             fine_tuned_answer, fine_tuned_latency = _generate_answer(
                 model=model,
                 tokenizer=tokenizer,
                 example=example,
                 max_new_tokens=plan.max_new_tokens,
+                do_sample=plan.do_sample,
+                temperature=plan.temperature,
+                top_p=plan.top_p,
+                top_k=plan.top_k,
+                repetition_penalty=plan.repetition_penalty,
+                generation_seed=generation_seed,
                 torch=torch,
             )
             base_result = base_results.get(example.record_id)
