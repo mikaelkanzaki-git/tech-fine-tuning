@@ -7,6 +7,28 @@ do MedQuAD, ChromaDB nem a aplicação que fará inferência.
 O primeiro modelo escolhido é o `Qwen3-4B-Instruct-2507`, quantizado em 4 bits. Ele é muito menor
 que o modelo de 17B testado anteriormente e o perfil inicial limita o treinamento a 50 passos.
 
+## Arquitetura
+
+O serviço usa a mesma Arquitetura em Camadas Pragmática dos demais projetos:
+
+```text
+src/tech_fine_tuning/
+├── models/          DTOs, configurações e resultados internos
+├── services/        Preparação, auditoria, treinamento e avaliação
+├── integrations/    JSONL, sistema, manifestos e Unsloth
+├── config/          Settings e composição
+├── errors.py
+└── runner.py
+```
+
+Para quem vem de Java/Spring: `models` representa DTOs e tipos do domínio, `services` contém os
+casos de uso, `integrations` encapsula SDKs externos, `config` equivale à configuração da
+aplicação e `runner.py` é a entrada executável. `repositories` e `api` não existem porque este
+serviço não possui banco nem transporte HTTP.
+
+O detalhamento está em
+[`docs/architecture/pragmatic-layered-architecture.md`](docs/architecture/pragmatic-layered-architecture.md).
+
 ## Fluxo
 
 ```text

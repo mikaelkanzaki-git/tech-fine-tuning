@@ -5,6 +5,19 @@
 Adotada pelo `tech-fine-tuning` desde a primeira fatia executável. A organização segue a referência do
 `ms-ai-agent`, adaptada somente às responsabilidades existentes neste serviço.
 
+## Equivalência com Java/Spring
+
+| Java/Spring | Convenção adotada |
+| --- | --- |
+| `src/main/java` | `src/tech_fine_tuning` |
+| `src/test/java` | `tests/` |
+| `model` / DTO | `models/` |
+| `service` | `services/` |
+| client de API ou SDK | `integrations/<sistema>/` |
+| `@Configuration` | `config/` |
+| `application.yml` | `config/settings.py` e arquivos TOML em `configs/` |
+| `Application.java` | `__main__.py` e `runner.py` |
+
 ## Estrutura atual
 
 ```text
